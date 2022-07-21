@@ -1,0 +1,128 @@
+import * as React from 'react'
+import { useState, useEffect } from 'react'
+import {
+  View,
+  StyleSheet,
+  StatusBar,
+  Platform,
+  Pressable,
+  FlatList,
+  Image,
+} from 'react-native'
+import Banner from '../../components/home/Banner'
+import LocationButton from '../../components/location/LocationButton'
+import Title from '../../components/common/Title'
+import SearchBar from '../../components/search/Searchbar'
+import EventList from '../../components/event/EventList'
+import DummyDate from '../../data/DummyData.json'
+import axios, { AxiosRequestConfig } from 'axios'
+import { EventType } from '../../models/Event'
+import { useNavigation } from '@react-navigation/native'
+import { useSelector } from 'react-redux'
+import { RootState } from '../../store/Index'
+
+const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 40 : StatusBar.currentHeight
+
+export default function Home() {
+  const navigation = useNavigation()
+  const region = useSelector(
+    (state: RootState) => state.region.region,
+  )
+  const [list, setList] = useState<EventType[]>([])
+  const [load, setLoad] = useState<boolean>(false)
+  const [page, setPage] = useState(1)
+  
+  const getEventList = async () => {
+    try {
+      if(page >= 1){
+        const config: AxiosRequestConfig = {
+          method: 'get',
+          url: `http://server.beeimp.com:18080/event/list?page=${page}&count=5&region=${region}`,
+          withCredentials: true,
+        }
+        console.log('지역',region)
+        const res = await axios(config)
+        if(res.data.message){
+          console.log(res.data.message)
+          setPage(0)
+        }else{
+          console.log('검색됨==============')
+          setPage(page+1)
+          setList([...list,...res.data])
+        }
+      }
+    } catch (err) {
+      alert(err)
+    }
+  }
+  useEffect(()=>{
+    setLoad(true)
+    setList([])
+    setPage(1)
+    getEventList()
+    .then(()=>{
+      setLoad(false)
+    })
+  },[region])
+
+  useEffect(() => {
+    getEventList()
+  }, [])
+
+  const endReached = async () => {
+    setLoad(true)
+    getEventList()
+    .then(()=>{
+      setLoad(false)
+    })
+    
+  }
+
+  return (
+    <View style={style.homeContainer}>
+      <LocationButton region={region}/>
+      <FlatList
+        data={['0']}
+        onEndReached={endReached}
+        onEndReachedThreshold={0.5}
+        renderItem={() => (
+          <>
+            <View>
+              <Title title={'찾았다 내 취향 💕'} size={22} />
+              <Title title={'ZeroTeb에서 발견!'} size={22} />
+              <Banner eventList={list} />
+              <Pressable //입력창 누르면 Search tab으로 이동
+                onPressIn={() => navigation.navigate('SearchStackScreen')}
+              >
+                <SearchBar
+                  editable={false} //터치했을때 키보드 안나오게
+                />
+              </Pressable>
+            </View>
+            <View>
+              <Title title={'다가오는 공연'} size={17} />
+              <EventList eventList={list} />
+            </View>
+            {load ? (
+              <Image
+                source={{
+                  uri: 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Loading_2.gif',
+                }}
+                style={{ width: 100, height: 100, alignSelf: 'center' }}
+              />
+            ) : null}
+          </>
+        )}
+      />
+    </View>
+  )
+}
+
+const style = StyleSheet.create({
+  homeContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+    backgroundColor: 'white',
+    marginTop: STATUSBAR_HEIGHT,
+  },
+})
